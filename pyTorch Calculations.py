@@ -57,14 +57,28 @@ print("----- Determinant (Δ) -----")
 print(f"Δ = S11 * S22 - S12 * S21 = {Delta:.3f}")
 print(f"|Δ| = {Delta_magnitude.item():.3f}\n")
 
+
+#------------------------------------------------------------------------------
+# Calculating B1, B2, C1, C2
+#------------------------------------------------------------------------------
+
+S11_mag_2 = torch.abs(S11)**2
+S22_mag_2 = torch.abs(S22)**2
+Delta_magnitude_2 = Delta_magnitude**2
+
+B1 = 1 + S11_mag_2 - S22_mag_2 - Delta_magnitude_2 
+B2 = 1 + S22_mag_2 - S11_mag_2 - Delta_magnitude_2
+C1 = S11 - (Delta * (torch.conj(S22)))
+C2 = S22 - (Delta * (torch.conj(S11)))
+
+
 # -----------------------------------------------------------------------------
 # Calculating the Stability Factor (K)
 # -----------------------------------------------------------------------------
 
 # Calculate numerator:
-S11_mag_2 = torch.abs(S11)**2
-S22_mag_2 = torch.abs(S22)**2
-Delta_magnitude_2 = Delta_magnitude**2
+
+
 numerator = 1 - S11_mag_2 - S22_mag_2 + Delta_magnitude_2
 
 # Calculate denominator:
