@@ -1,7 +1,7 @@
 import torch
 
 # -----------------------------------------------------------------------------
-#  Defining and Organising S-Parameters
+#  Defining S-Parameters of BFP540 @ 5GHz
 # -----------------------------------------------------------------------------
 
 # Assigning the provided values
@@ -24,39 +24,27 @@ S22_mag = torch.tensor(0.2001)
 S22_ang_deg = torch.tensor(-138.1)
 
 # -----------------------------------------------------------------------------
-# Stage 2: Converting S-Parameters from Polar to Rectangular Form
+# Converting S-Parameters from Polar to Cartesian Form
 # -----------------------------------------------------------------------------
 
-def polar_to_rect(magnitude, angle_deg):
+def polar_to_cartesian(magnitude, angle_deg):
     angle_rad = torch.deg2rad(angle_deg)  # Convert degrees to radians
     real = magnitude * torch.cos(angle_rad)
     imag = magnitude * torch.sin(angle_rad)
     return torch.complex(real, imag)
 
-# Convert each S-parameter to rectangular form
-S11 = polar_to_rect(S11_mag, S11_ang_deg)
-S21 = polar_to_rect(S21_mag, S21_ang_deg)
-S12 = polar_to_rect(S12_mag, S12_ang_deg)
-S22 = polar_to_rect(S22_mag, S22_ang_deg)
-
-print("----- S-Parameters (5GHz) in Rectangular Form -----")
-print(f"S11: {S11:.3f}")
-print(f"S21: {S21:.3f}")
-print(f"S12: {S12:.3f}")
-print(f"S22: {S22:.3f}\n")
+# Convert each S-parameter to cartesian form
+S11 = polar_to_cartesian(S11_mag, S11_ang_deg)
+S21 = polar_to_cartesian(S21_mag, S21_ang_deg)
+S12 = polar_to_cartesian(S12_mag, S12_ang_deg)
+S22 = polar_to_cartesian(S22_mag, S22_ang_deg)
 
 # -----------------------------------------------------------------------------
 # Calculating the Determinant (Δ)
 # -----------------------------------------------------------------------------
 
-# Calculate Δ = S11 * S22 - S12 * S21
 Delta = S11 * S22 - S12 * S21
 Delta_magnitude = torch.abs(Delta)
-
-print("----- Determinant (Δ) -----")
-print(f"Δ = S11 * S22 - S12 * S21 = {Delta:.3f}")
-print(f"|Δ| = {Delta_magnitude.item():.3f}\n")
-
 
 #------------------------------------------------------------------------------
 # Calculating B1, B2, C1, C2
@@ -71,81 +59,76 @@ B2 = 1 + S22_mag_2 - S11_mag_2 - Delta_magnitude_2
 C1 = S11 - (Delta * (torch.conj(S22)))
 C2 = S22 - (Delta * (torch.conj(S11)))
 
+#------------------------------------------------------------------------------\
+# Reflection Coefficients 
+#------------------------------------------------------------------------------
 
-# -----------------------------------------------------------------------------
-# Calculating the Stability Factor (K)
-# -----------------------------------------------------------------------------
+# Source Reflection Coeffcient (Positive and Negative)
+Gamma_s_pos = (B1 + torch.sqrt((B1 **2) - (4 * torch.abs(C1)**2))) / (2 * C1)
+Gamma_s_neg = (B1 - torch.sqrt((B1 **2) - (4 * torch.abs(C1)**2))) / (2 * C1)
 
-# Calculate numerator:
+# Load Reflection Coefficients (Positive and Negative)
+Gamma_l_pos = (B2 + torch.sqrt((B2 **2) - (4 * torch.abs(C2)**2))) / (2 * C2)
+Gamma_l_neg = (B2 - torch.sqrt((B2 **2) - (4 * torch.abs(C2)**2))) / (2 * C2)
 
+# Checking which Absolute Values of Reflection Coefficients are less than 1
 
-numerator = 1 - S11_mag_2 - S22_mag_2 + Delta_magnitude_2
-
-# Calculate denominator:
-S12_S21 = S12 * S21
-S12_S21_magnitude = torch.abs(S12_S21)
-denominator = 2 * S12_S21_magnitude
-
-# Calculate Stability Factor (K)
-K = numerator / denominator
-
-print("----- Stability Factor (K) -----")
-
-print(f"Stability Factor K = {K.item():.3f}\n")
-
-# -----------------------------------------------------------------------------
-# Assessing Transistor Stability
-# -----------------------------------------------------------------------------
-
-print("----- Stability Check -----")
-if (K > 1) and (Delta_magnitude < 1):
-    print(f"K = {K.item():.3f} > 1 and |Δ| = {Delta_magnitude.item():.3f} < 1")
-    print("The transistor is unconditionally stable at 5 GHz.\n")
-    unconditionally_stable = True
+if torch.abs(Gamma_s_pos) < torch.abs(Gamma_s_neg):
+    Gamma_in = S11 + ((S12 * S21 * Gamma_l_pos)/(1 - (S11 * Gamma_l_pos)))
 else:
-    print(f"K = {K.item():.3f} <= 1 or |Δ| = {Delta_magnitude.item():.3f} >= 1")
-    print("The transistor is not unconditionally stable at 5 GHz.\n")
-    unconditionally_stable = False
+     Gamma_in = S11 + ((S12 * S21 * Gamma_l_neg)/(1 - (S11 * Gamma_l_neg)))
 
-# -----------------------------------------------------------------------------
-# Calculating Maximum Available Gain (G_Tmax)
-# -----------------------------------------------------------------------------
-
-if unconditionally_stable:
-    # Calculate G_Tmax using the formula:
-    # G_Tmax = (|S21| / |S12|) * (K - sqrt(K^2 - 1))
-    
-    # Calculate |S21| / |S12|
-    S21_over_S12 = S21_mag / S12_mag
-    
-    # Calculate sqrt(K^2 - 1)
-    sqrt_term = torch.sqrt(K**2 - 1)
-    
-    # Calculate (K - sqrt(K^2 - 1))
-    K_minus_sqrt = K - sqrt_term
-    
-    # Calculate G_Tmax
-    G_Tmax = S21_over_S12 * K_minus_sqrt
-    
-    # Convert G_Tmax to decibels (dB)
-    G_Tmax_dB = 10 * torch.log10(G_Tmax)
-    
-    print("----- Maximum Available Transducer Gain (G_Tmax) -----")
-    print(f"G_Tmax (linear) = {G_Tmax.item():.3f}")
-    print(f"G_Tmax (dB) = {G_Tmax_dB.item():.3f} dB\n")
+if torch.abs(Gamma_l_pos) < torch.abs(Gamma_l_neg):
+    Gamma_out = S22 + ((S12 * S21 * Gamma_s_pos)/(1 - (S11 * Gamma_s_pos)))
 else:
-    print("Since the transistor is not unconditionally stable, G_Tmax cannot be reliably calculated.\n")
+    Gamma_out = S22 + ((S12 * S21 * Gamma_s_neg)/(1 - (S11 * Gamma_s_neg)))
+   
+#------------------------------------------------------------------------------
+# Calculating Gs, Go, GL and G_T
+#------------------------------------------------------------------------------
 
-# -----------------------------------------------------------------------------
-# Summary of Results
-# -----------------------------------------------------------------------------
+gain_source = 1 / (1 - (torch.abs(Gamma_s_neg)** 2))
+gain_internal = torch.abs(S21)**2
+gain_load = (1-torch.abs(Gamma_l_neg)**2) / (torch.abs(1- S22*Gamma_l_neg)**2)
 
-if unconditionally_stable:
-    print("===== Summary =====")
-    print(f"Transistor Stability: Unconditionally Stable")
-    print(f"Maximum Transducer Gain (G_Tmax): {G_Tmax.item():.3f} (linear)")
-    print(f"Maximum Transducer Gain (G_Tmax): {G_Tmax_dB.item():.3f} dB")
-else:
-    print("===== Summary =====")
-    print(f"Transistor Stability: Not Unconditionally Stable")
-    print(f"Maximum Transducer Gain (G_Tmax): Cannot be calculated reliably.")
+gain_max = gain_source * gain_internal * gain_load
+gain_max_dB = 10 * torch.log10(gain_max)
+
+# ------------------------------------------------------------------------------
+# Outputting Results
+# ------------------------------------------------------------------------------
+
+print(f"""
+===== S-Parameters (5GHz) in Rectangular Form =====
+S11: {S11:.3f}
+S21: {S21:.3f}
+S12: {S12:.3f}
+S22: {S22:.3f}
+
+===== Determinant (Δ) =====
+Δ: {Delta:.3f}
+|Δ|: {Delta_magnitude.item():.3f} 
+
+===== B1, B2, C1, C2 =====
+B1: {B1:.3f}
+B2: {B2:.3f}
+C1: {C1:.3f}
+C2: {C2:.3f} 
+
+===== Reflection Coefficients ===== 
+Positive Source Reflection Coefficient: {Gamma_s_pos:.3f}
+Negative Source Reflection Coefficient: {Gamma_s_neg:.3f}
+Positive Load Reflection Coefficient: {Gamma_l_pos:.3f}
+Negative Load Reflection Coefficient: {Gamma_l_neg:.3f}
+Input Reflection Coefficient: {Gamma_in:.4f}
+Output Reflection Coefficient: {Gamma_out:.3f}
+
+===== Amplifier Gains =====
+Gain Source (Gs): {gain_source.item():.3f}
+Gain Internal (Go): {gain_internal.item():.3f}
+Gain Load (Gl): {gain_load.item():.3f}
+
+========= Final Results ==========
+Max Gain (Linear): {gain_max.item():.3f}
+Max Gain (dB): {gain_max_dB.item():.3f} dB
+""")
