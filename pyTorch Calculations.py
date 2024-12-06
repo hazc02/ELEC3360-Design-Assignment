@@ -99,7 +99,7 @@ gain_max_dB = 10 * torch.log10(gain_max)
 # ------------------------------------------------------------------------------
 
 print(f"""
-===== S-Parameters (5GHz) in Rectangular Form =====
+===== S-Parameters (5GHz) in Cartesian Form =====
 S11: {S11:.3f}
 S21: {S21:.3f}
 S12: {S12:.3f}
@@ -132,3 +132,27 @@ Gain Load (Gl): {gain_load.item():.3f}
 Max Gain (Linear): {gain_max.item():.3f}
 Max Gain (dB): {gain_max_dB.item():.3f} dB
 """)
+
+
+#-----------------------------------------------------------------
+# Question 2
+#-----------------------------------------------------------------
+
+#-----------------------------------------------------------------
+# Convert Reflection Coeffcient to Normalised Impedenace 
+#-----------------------------------------------------------------
+
+impedance_norm_s = (1 + Gamma_in) / (1 - Gamma_in)
+impedance_norm_l = (1 + Gamma_out) / (1 - Gamma_out)
+
+#-----------------------------------------------------------------
+# Convert to Normalised Admittance 
+#-----------------------------------------------------------------
+
+admittance_norm_s = 1 / (impedance_norm_s)
+admittance_norm_l = 1 / (impedance_norm_l)
+
+print(f"Normalised Source Impedance: {impedance_norm_s:.3f}")
+print(f"Normalised Load Impedance: {impedance_norm_l:.3f} \n")
+print(f"Normalised Source Admittance: {admittance_norm_s:.3f}")
+print(f"Normalised Load Admittance: {admittance_norm_l:.3f}")
